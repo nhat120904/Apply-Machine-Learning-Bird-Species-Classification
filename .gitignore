@@ -1,0 +1,30 @@
+# Ignore zip files
+*.zip
+
+# Ignore TensorBoard log files
+events.out.tfevents.*
+
+# Ignore checkpoint files
+*.pth
+*.pt
+*.ckpt
+
+# Ignore dataset folder
+dataset/
+
+
+# Ignore any other common data or model files
+*.h5
+*.hdf5
+*.pkl
+*.npy
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Ignore virtual environment directories
+venv/
+
+
+
