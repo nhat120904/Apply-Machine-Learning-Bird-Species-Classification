@@ -17,7 +17,7 @@ class GaussianBlur(object):
     def __call__(self, img):
         return img.filter(ImageFilter.GaussianBlur(radius=self.radius))
 
-# More aggressive data augmentation for training
+# data augmentation for training
 train_transform = transforms.Compose([
     transforms.RandomResizedCrop(224, scale=(0.08, 1.0)),
     transforms.RandomRotation(30),
@@ -31,7 +31,6 @@ train_transform = transforms.Compose([
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# Test transform remains the same
 test_transform = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
@@ -43,7 +42,6 @@ root_dir = 'dataset'
 train_dataset = CUB200Dataset(root_dir, split='Train', transform=train_transform)
 test_dataset = CUB200Dataset(root_dir, split='Test', transform=test_transform)
 
-# Assuming your original train_dataset is the full training set
 train_idx, val_idx = train_test_split(range(len(train_dataset)), test_size=0.2, random_state=42)
 
 train_subsampler = torch.utils.data.SubsetRandomSampler(train_idx)
@@ -62,12 +60,13 @@ val_loader = torch.utils.data.DataLoader(
     sampler=val_subsampler,
     num_workers=4
 )
-# Create the model
+
+# initialize model, criterion, optimizer
 model = BirdClassifier(architecture='efficientnet_b5').to('cuda' if torch.cuda.is_available() else 'cpu')
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# Training function
+# Training
 def train_model(model, criterion, optimizer, train_loader, val_loader, num_epochs=20):
     writer = SummaryWriter()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -125,17 +124,17 @@ def train_model(model, criterion, optimizer, train_loader, val_loader, num_epoch
         val_acc = 100. * correct / total
         print(f'Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_acc:.2f}%')
         
-        # Log metrics to TensorBoard
+        # log metrics to TensorBoard
         writer.add_scalar('Loss/train', train_loss, epoch)
         writer.add_scalar('Loss/val', val_loss, epoch)
         writer.add_scalar('Accuracy/train', train_acc, epoch)
         writer.add_scalar('Accuracy/val', val_acc, epoch)
         writer.add_scalar('Learning Rate', optimizer.param_groups[0]['lr'], epoch)
         
-        # Update the learning rate
+        # update the learning rate
         scheduler.step(val_loss)
         
-        # Save the best model
+        # save the best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), 'best_model_efficientnet_b5.pth')
@@ -149,5 +148,4 @@ def train_model(model, criterion, optimizer, train_loader, val_loader, num_epoch
     # print("Model saved successfully.")
 
 if __name__ == "__main__":
-    # Assuming you have separate train and validation loaders
     train_model(model, criterion, optimizer, train_loader, val_loader, num_epochs=30)

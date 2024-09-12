@@ -67,9 +67,9 @@ if __name__ == "__main__":
 
     model = BirdClassifier(architecture="efficientnet_b0").to('cuda' if torch.cuda.is_available() else 'cpu')
     model.load_state_dict(torch.load('bird_classifier_efficientnet_b0.pth', weights_only=True))
-    # After training the model, evaluate it
+    # evaluation
     top1_acc, avg_acc_per_class, class_accuracies = evaluate_model(model, test_loader)
 
-    # If you want to print individual class accuracies
+    # print individual class accuracies
     for i, acc in enumerate(class_accuracies):
         print(f"Class {i} accuracy: {acc:.2f}%")

@@ -22,7 +22,7 @@ class BirdClassifier(nn.Module):
         elif architecture == 'mobilenet_v2':
             self.model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
         
-        # Replace the last fully connected layer
+        # replace the last fully connected layer
         if architecture.startswith('resnet'):
             num_ftrs = self.model.fc.in_features
             self.model.fc = nn.Linear(num_ftrs, num_classes)
