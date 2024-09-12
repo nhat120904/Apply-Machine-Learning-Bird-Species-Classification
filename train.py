@@ -63,7 +63,7 @@ val_loader = torch.utils.data.DataLoader(
     num_workers=4
 )
 # Create the model
-model = BirdClassifier(architecture='efficientnet_b7').to('cuda' if torch.cuda.is_available() else 'cpu')
+model = BirdClassifier(architecture='efficientnet_b5').to('cuda' if torch.cuda.is_available() else 'cpu')
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
@@ -138,7 +138,7 @@ def train_model(model, criterion, optimizer, train_loader, val_loader, num_epoch
         # Save the best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), 'best_model.pth')
+            torch.save(model.state_dict(), 'best_model_efficientnet_b5.pth')
             print("Saved best model")
     
     writer.close()

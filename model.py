@@ -17,8 +17,8 @@ class BirdClassifier(nn.Module):
         super(BirdClassifier, self).__init__()
         if architecture == 'resnet50':
             self.model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-        elif architecture == 'efficientnet_b7':
-            self.model = models.efficientnet_b7(weights=models.EfficientNet_B7_Weights.DEFAULT)
+        elif architecture == 'efficientnet_b5':
+            self.model = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
         elif architecture == 'mobilenet_v2':
             self.model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
         
@@ -26,7 +26,7 @@ class BirdClassifier(nn.Module):
         if architecture.startswith('resnet'):
             num_ftrs = self.model.fc.in_features
             self.model.fc = nn.Linear(num_ftrs, num_classes)
-        elif architecture == 'efficientnet_b0':
+        elif architecture == 'efficientnet_b5':
             num_ftrs = self.model.classifier[1].in_features
             self.model.classifier[1] = nn.Linear(num_ftrs, num_classes)
         elif architecture == 'mobilenet_v2':
