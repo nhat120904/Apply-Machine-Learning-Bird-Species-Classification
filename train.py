@@ -4,11 +4,20 @@ import torch.nn as nn
 import torch.optim as optim
 from load_data import CUB200Dataset
 from model import BirdClassifier
+from bird_detect import detect_birds_in_image
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from PIL import ImageFilter
 from sklearn.model_selection import train_test_split
 
+class BirdCropTransform:
+    def __init__(self):
+        pass
+
+    def __call__(self, image):
+        # Apply your custom bird detection and cropping function
+        bird_cropped_image = detect_birds_in_image(image)
+        return bird_cropped_image
 
 class GaussianBlur(object):
     def __init__(self, radius):
@@ -19,6 +28,7 @@ class GaussianBlur(object):
 
 # data augmentation for training
 train_transform = transforms.Compose([
+    BirdCropTransform(), 
     transforms.RandomResizedCrop(224, scale=(0.08, 1.0)),
     transforms.RandomRotation(30),
     transforms.RandomHorizontalFlip(),
@@ -32,6 +42,7 @@ train_transform = transforms.Compose([
 ])
 
 test_transform = transforms.Compose([
+    BirdCropTransform(), 
     transforms.Resize(256),
     transforms.CenterCrop(224),
     transforms.ToTensor(),

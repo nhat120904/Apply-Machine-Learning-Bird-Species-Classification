@@ -6,7 +6,7 @@ events.out.tfevents.*
 
 # Ignore checkpoint files
 *.pth
-*.pt
+# *.pt
 *.ckpt
 
 # Ignore dataset folder
