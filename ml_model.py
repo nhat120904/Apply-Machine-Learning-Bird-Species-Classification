@@ -14,68 +14,35 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from load_data import CUB200Dataset
 
+train_transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
 
-class CUB200Dataset(Dataset):
-    def __init__(self, root_dir, split='train', transform=None):
-        self.root_dir = root_dir
-        self.split = split
-        self.transform = transform or self.default_transform()
+test_transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+root_dir = 'dataset'
+train_dataset = CUB200Dataset(root_dir, split='Train', transform=train_transform)
+test_dataset = CUB200Dataset(root_dir, split='Test', transform=test_transform)
 
-        # Load metadata
-        self.data = self.load_metadata()
-        self.create_class_mapping()
-        
-    def load_metadata(self):
-        split_file = os.path.join(self.root_dir, f'{self.split}.txt')
-        data = pd.read_csv(split_file, sep=' ', names=['filename', 'label'])
-        data['filepath'] = data['filename'].apply(lambda x: os.path.join(self.root_dir + '/' + self.split, self.split, x))
-        data['class_name'] = data['filename'].apply(self.extract_class_name)
-        return data
+# Load pre-trained ResNet50 model
+resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+# Remove the last fully connected layer
+feature_extractor = torch.nn.Sequential(*list(resnet.children())[:-1])
+feature_extractor.eval() 
 
-    def extract_class_name(self, filename):
-        # Extract class name from filename
-        parts = filename.split('_')
-        return ' '.join(parts[:-2])
-    
-    def default_transform(self):
-        return transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        img_path = self.data.iloc[idx]['filepath']
-        image = Image.open(img_path).convert('RGB')
-        
-        if self.transform:
-            image = self.transform(image)
-        
-        label = self.data.iloc[idx]['label']
-        
-        return image, label
-    
-    def create_class_mapping(self):
-        class_mapping = {}
-        for _, row in self.data.iterrows():
-            label = row['label']
-            class_name = row['class_name']
-            if label not in class_mapping:
-                class_mapping[label] = class_name
-        self.class_mapping = class_mapping
-
-    def get_class_name(self, class_idx):
-        return self.class_mapping[class_idx]
-
-    def get_class_idx(self, class_name):
-        return self.class_mapping.index(class_name)
-    
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+feature_extractor = feature_extractor.to(device)
 def extract_features(dataset, batch_size=32):
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
     features = []
     labels = []
     
@@ -87,68 +54,58 @@ def extract_features(dataset, batch_size=32):
             labels.append(batch_labels.numpy())
     
     return np.concatenate(features), np.concatenate(labels)
-    
+def compute_average_accuracy_per_class(y_true, y_pred, num_classes=200):
+    class_report = classification_report(y_true, y_pred, output_dict=True)
+    accuracies_per_class = [class_report[str(i)]['recall'] for i in range(num_classes) if str(i) in class_report]
+    return np.mean(accuracies_per_class)
+
 if __name__ == '__main__':
     
-    train_transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-
-    test_transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    root_dir = 'dataset'
-    train_dataset = CUB200Dataset(root_dir, split='Train', transform=train_transform)
-    test_dataset = CUB200Dataset(root_dir, split='Test', transform=test_transform)
-    
-    # Load pre-trained ResNet50 model
-    resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-    # Remove the last fully connected layer
-    feature_extractor = torch.nn.Sequential(*list(resnet.children())[:-1])
-    feature_extractor.eval()  # Set to evaluation mode
-
-    # Move to GPU if available
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    feature_extractor = feature_extractor.to(device)
-
     # Extract features from train and test datasets
-    print("Extracting features from training set...")
     X_train, y_train = extract_features(train_dataset)
-    print("Extracting features from test set...")
     X_test, y_test = extract_features(test_dataset)
 
-    # Train an SVM classifier
+    # Initialize a dictionary to store results
+    model_results = {}
+    # Random Forest Classifier
     print("Training RF classifier...")
-    rf_classifier = RandomForestClassifier(n_estimators=50, random_state=42)
+    rf_classifier = RandomForestClassifier(n_estimators=100, random_state=42)
     rf_classifier.fit(X_train, y_train)
 
-    # Make predictions
-    print("Making predictions...")
-    y_pred = rf_classifier.predict(X_test)
-    y_train_pred = rf_classifier.predict(X_train)
+    print("Making predictions for RF...")
+    y_pred_rf = rf_classifier.predict(X_test)
+    rf_accuracy = accuracy_score(y_test, y_pred_rf)
+    rf_avg_accuracy_per_class = compute_average_accuracy_per_class(y_test, y_pred_rf)
 
-    # Calculate accuracy
-    accuracy = accuracy_score(y_test, y_pred)
-    train_accuracy = accuracy_score(y_train, y_train_pred)
-    print(f"RF Accuracy: {accuracy:.4f}")
-    print(f"RF Train Accuracy: {train_accuracy:.4f}")
+    # Store results for Random Forest
+    model_results['Random Forest'] = {'Top-1 Accuracy': rf_accuracy, 'Average Accuracy per Class': rf_avg_accuracy_per_class}
+    
+    # SVM Classifier
+    print("Training SVM classifier...")
+    svm_classifier = SVC(kernel='linear', C=1.0, random_state=42)
+    svm_classifier.fit(X_train, y_train)
 
-    # Print detailed classification report
-    print("\nClassification Report:")
-    print(classification_report(y_test, y_pred))
-    print(classification_report(y_train, y_train_pred))
+    print("Making predictions for SVM...")
+    y_pred_svm = svm_classifier.predict(X_test)
+    svm_accuracy = accuracy_score(y_test, y_pred_svm)
+    svm_avg_accuracy_per_class = compute_average_accuracy_per_class(y_test, y_pred_svm)
 
-    # Calculate average accuracy per class
-    class_accuracies = classification_report(y_test, y_pred, output_dict=True)
-    avg_accuracy_per_class = np.mean([class_accuracies[str(i)]['f1-score'] for i in range(200)])
-    print(f"\nAverage Accuracy per Class: {avg_accuracy_per_class:.4f}")
+    # Store results for SVM
+    model_results['SVM'] = {'Top-1 Accuracy': svm_accuracy, 'Average Accuracy per Class': svm_avg_accuracy_per_class}
+    from sklearn.tree import DecisionTreeClassifier
 
+    # Decision Tree Classifier
+    print("Training Decision Tree classifier...")
+    dt_classifier = DecisionTreeClassifier(random_state=42)
+    dt_classifier.fit(X_train, y_train)
 
+    print("Making predictions for Decision Tree...")
+    y_pred_dt = dt_classifier.predict(X_test)
+    dt_accuracy = accuracy_score(y_test, y_pred_dt)
+    dt_avg_accuracy_per_class = compute_average_accuracy_per_class(y_test, y_pred_dt)
 
+    # Store results for Decision Tree
+    model_results['Decision Tree'] = {'Top-1 Accuracy': dt_accuracy, 'Average Accuracy per Class': dt_avg_accuracy_per_class}
+    results_df = pd.DataFrame(model_results).T
 
+    print(results_df)

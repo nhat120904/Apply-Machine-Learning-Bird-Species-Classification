@@ -11,6 +11,8 @@ events.out.tfevents.*
 
 # Ignore dataset folder
 dataset/
+bird_crops/
+new_dataset/
 
 
 # Ignore any other common data or model files

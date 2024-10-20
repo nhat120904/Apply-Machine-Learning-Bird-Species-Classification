@@ -3,6 +3,7 @@ import pandas as pd
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
+import numpy as np
 
 
 class CUB200Dataset(Dataset):
@@ -41,7 +42,13 @@ class CUB200Dataset(Dataset):
         img_path = self.data.iloc[idx]['filepath']
         image = Image.open(img_path).convert('RGB')
         
+        # Ensure the image is a PIL image
+        if isinstance(image, np.ndarray):
+            image = Image.fromarray(image)
+        
         if self.transform:
+            if isinstance(image, np.ndarray):
+                image = Image.fromarray(image)
             image = self.transform(image)
         
         label = self.data.iloc[idx]['label']
